@@ -431,6 +431,7 @@ cam_distance = 60.0
 cam_theta = 45.0
 cam_phi = 30.0
 
+
 # режимы:
 # 1: точки наблюдений вершин (синие)
 # 2: траектории центра масс (true/est) + CM наблюдений
@@ -438,6 +439,7 @@ cam_phi = 30.0
 # 4: пустое поле (только сетка)
 # 5: траектории вершин (true/est), как 3
 view_mode = 1
+prev_utf8_byte = None  # для отслеживания русской буквы "л"/"Л"
 
 # список «летящих» кубов, каждый хранит локальный индекс по траектории
 # элемент: {"idx": int}
@@ -706,7 +708,8 @@ def reshape(w, h):
 
 
 def keyboard(key, x, y):
-    global cam_distance, view_mode, flying_cubes
+    global cam_distance, view_mode, flying_cubes, prev_utf8_byte
+
     if key in (b'-', b'_'):
         cam_distance += 2.0
     elif key in (b'=', b'+'):
@@ -723,6 +726,18 @@ def keyboard(key, x, y):
         # запускаем новый куб со старта восстановленной траектории
         if traj_vertices_est is not None and total_steps is not None and total_steps > 0:
             flying_cubes.append({"idx": 0})
+    else:
+        # Обработка русской "л"/"Л" в UTF‑8: D0 BB / D0 9B
+        bval = key[0]
+        if prev_utf8_byte == 0xD0 and bval in (0xBB, 0x9B):
+            # распознали 'л' или 'Л'
+            if traj_vertices_est is not None and total_steps is not None and total_steps > 0:
+                flying_cubes.append({"idx": 0})
+            prev_utf8_byte = None
+        else:
+            # запоминаем текущий байт как потенциальное начало многобайтового символа
+            prev_utf8_byte = bval
+
     glutPostRedisplay()
 
 
