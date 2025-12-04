@@ -548,8 +548,6 @@ def draw_legend(width, height):
         draw_text_2d(x0 + 8, y_text, "Mode 3: vertex trajectories")
     elif view_mode == 4:
         draw_text_2d(x0 + 8, y_text, "Mode 4: empty field (grid only)")
-    elif view_mode == 5:
-        draw_text_2d(x0 + 8, y_text, "Mode 5: vertex trajectories (as 3)")
 
     y_text -= 16
     draw_text_2d(x0 + 8, y_text, f"Active cubes: {len(flying_cubes)}")
@@ -721,8 +719,6 @@ def keyboard(key, x, y):
         view_mode = 3
     elif key == b'4':
         view_mode = 4
-    elif key == b'5':
-        view_mode = 5
     elif key in (b'k', b'K'):
         # запускаем новый куб со старта восстановленной траектории
         if traj_vertices_est is not None and total_steps is not None and total_steps > 0:
