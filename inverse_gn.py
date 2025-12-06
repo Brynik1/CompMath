@@ -437,11 +437,12 @@ cam_phi = 30.0
 # 3: траектории вершин (true/est)
 # 4: пустое поле (только сетка)
 # 5: траектории вершин (true/est), как 3
-view_mode = 1
+RANDOM_COLOR = False
+view_mode = 3
 prev_utf8_byte = None  # для отслеживания русской буквы "л"/"Л"
 
-# список «летящих» кубов, каждый хранит локальный индекс по траектории
-# элемент: {"idx": int}
+# список «летящих» кубов, каждый хранит:
+# {"idx": int, "R_color": np.ndarray (3x3)}
 flying_cubes: list[dict] = []
 
 
@@ -537,10 +538,10 @@ def draw_legend(width, height):
     draw_text_2d(
         x0 + 8,
         y_text,
-        "1: obs verts; 2: CM; 3: verts; 4: empty; 5: verts; k: launch cube"
+        "1: obs; 2: CM; 3: verts; 4: empty; k: launch cube"
     )
 
-    y_text -= 16
+    y_text -= 24
     if view_mode == 1:
         draw_text_2d(x0 + 8, y_text, "Mode 1: observation vertex points (blue)")
     elif view_mode == 2:
@@ -548,15 +549,13 @@ def draw_legend(width, height):
     elif view_mode == 3:
         draw_text_2d(x0 + 8, y_text, "Mode 3: vertex trajectories")
     elif view_mode == 4:
-        draw_text_2d(x0 + 8, y_text, "Mode 4: empty field (grid only)")
-    elif view_mode == 5:
-        draw_text_2d(x0 + 8, y_text, "Mode 5: vertex trajectories (as 3)")
+        draw_text_2d(x0 + 8, y_text, "Mode 4: empty field")
 
-    y_text -= 16
+    y_text -= 24
     draw_text_2d(x0 + 8, y_text, f"Active cubes: {len(flying_cubes)}")
 
     # наблюдения (синие точки)
-    y_text -= 18
+    y_text -= 20
     glColor3f(0.0, 0.5, 1.0)
     glBegin(GL_QUADS)
     glVertex2f(x0 + 8, y_text)
@@ -598,7 +597,12 @@ def draw_legend(width, height):
     glMatrixMode(GL_MODELVIEW)
 
 
-def draw_cube_from_vertices(verts: np.ndarray):
+def draw_cube_from_vertices(verts: np.ndarray, R_color: np.ndarray | None = None):
+    """
+    verts: (8,3) мировые координаты вершин
+    R_color: 3x3 ортонормальная матрица, задающая ориентацию «цветового» куба
+    """
+    # индексы вершин, как раньше
     faces = [
         (0, 1, 2, 3),  # top
         (4, 5, 6, 7),  # bottom
@@ -616,17 +620,42 @@ def draw_cube_from_vertices(verts: np.ndarray):
         (0.9, 0.5, 0.2),
     ]
 
+    if R_color is None:
+        R_color = np.eye(3, dtype=float)
+
+    # Центр куба в мировых координатах
+    center = verts.mean(axis=0)
+
     glBegin(GL_QUADS)
     for (i, face) in enumerate(faces):
         glColor3f(*colors[i])
         for idx in face:
             v = verts[idx]
-            glVertex3f(v[0], v[1], v[2])
+            # локальный вектор относительно центра
+            local = v - center
+            # повернуть локальный вектор матрицей цвета
+            rotated_local = R_color @ local
+            v_color = center + rotated_local
+            glVertex3f(v_color[0], v_color[1], v_color[2])
     glEnd()
 
 
+def random_orthonormal_matrix() -> np.ndarray:
+    """
+    Генерация случайной ортонормальной 3x3 матрицы (равномерно по SO(3)).
+    """
+    # случайная матрица Гаусса
+    A = np.random.normal(size=(3, 3))
+    # QR-разложение
+    Q, R = np.linalg.qr(A)
+    # гарантируем det(Q) = +1
+    if np.linalg.det(Q) < 0.0:
+        Q[:, 0] = -Q[:, 0]
+    return Q
+
+
 def display():
-    global frame_idx, total_steps
+    global frame_idx, total_steps, RANDOM_COLOR
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
 
@@ -653,9 +682,9 @@ def display():
     # 2: траектории центра масс (истинная и восстановленная) + CM наблюдений
     elif view_mode == 2:
         if full_traj_cm_true is not None:
-            draw_trajectory(full_traj_cm_true, color=(0.0, 1.0, 0.0), width=2.0)
+            draw_trajectory(full_traj_cm_true, color=(0.0, 1.0, 0.0), width=1.5)
         if traj_cm_est is not None:
-            draw_trajectory(traj_cm_est, color=(1.0, 0.3, 0.0), width=2.0)
+            draw_trajectory(traj_cm_est, color=(1.0, 0.3, 0.0), width=1.5)
 
     # 3: траектории вершин (истинные и восстановленные)
     elif view_mode == 3:
@@ -666,30 +695,23 @@ def display():
         if traj_vertices_est is not None:
             for i in range(8):
                 draw_trajectory(traj_vertices_est[:, i, :],
-                                color=(1.0, 0.4, 0.0), width=1.5)
+                                color=(1.0, 0.4, 0.0), width=1.0)
 
     # 4: пустое поле (только сетка)
     elif view_mode == 4:
         pass
 
-    # 5: траектории вершин (true/est) — как 3
-    elif view_mode == 5:
-        if full_traj_vertices_true is not None:
-            for i in range(8):
-                draw_trajectory(full_traj_vertices_true[:, i, :],
-                                color=(0.0, 0.9, 0.0), width=1.0)
-        if traj_vertices_est is not None:
-            for i in range(8):
-                draw_trajectory(traj_vertices_est[:, i, :],
-                                color=(1.0, 0.4, 0.0), width=1.5)
-
-    # Летящие кубы: каждый идёт по восстановленной траектории с собственного нулевого кадра
+    # Летящие кубы: каждый идёт по восстановленной траектории с собственной цветовой ориентацией
     if traj_vertices_est is not None and total_steps is not None:
         for cube in flying_cubes:
             k_local = cube["idx"]
             if 0 <= k_local < total_steps:
                 verts_k = traj_vertices_est[k_local]
-                draw_cube_from_vertices(verts_k)
+                if RANDOM_COLOR:
+                    R_color = cube["R_color"]
+                    draw_cube_from_vertices(verts_k, R_color=R_color)
+                else:
+                    draw_cube_from_vertices(verts_k)
 
     w = glutGet(GLUT_WINDOW_WIDTH)
     h = glutGet(GLUT_WINDOW_HEIGHT)
@@ -733,18 +755,18 @@ def keyboard(key, x, y):
     elif key in (b'k', b'K'):
         # запускаем новый куб со старта восстановленной траектории
         if traj_vertices_est is not None and total_steps is not None and total_steps > 0:
-            flying_cubes.append({"idx": 0})
+            R_color = random_orthonormal_matrix()
+            flying_cubes.append({"idx": 0, "R_color": R_color})
         prev_utf8_byte = None
     else:
         # Обработка русской "л"/"Л" в UTF‑8: D0 BB / D0 9B
         bval = key[0]
         if prev_utf8_byte == 0xD0 and bval in (0xBB, 0x9B):
-            # распознали 'л' или 'Л'
             if traj_vertices_est is not None and total_steps is not None and total_steps > 0:
-                flying_cubes.append({"idx": 0})
+                R_color = random_orthonormal_matrix()
+                flying_cubes.append({"idx": 0, "R_color": R_color})
             prev_utf8_byte = None
         else:
-            # запоминаем текущий байт как потенциальное начало многобайтового символа
             prev_utf8_byte = bval
 
     glutPostRedisplay()
@@ -768,13 +790,11 @@ def timer(value):
     if total_steps is not None and total_steps > 0:
         frame_idx = (frame_idx + 1) % total_steps
 
-        # обновляем локальный кадр для каждого куба
         new_list = []
         for cube in flying_cubes:
             cube["idx"] += 1
             if cube["idx"] < total_steps:
                 new_list.append(cube)
-            # если дошёл до конца траектории (после падения) — исчезает
         flying_cubes = new_list
 
     glutPostRedisplay()
@@ -824,7 +844,6 @@ def main():
         noise_std_vertices=NOISE_STD_VERTICES
     )
 
-    # сохраняем наблюдаемые вершины и их центр масс
     obs_vertices = V_obs
     cm_obs = compute_com_traj_from_vertices(V_obs)
 
@@ -856,9 +875,6 @@ def main():
     print(f"  q0_est    = {fmt_vec(q_init)}")
     print(f"  size_est  = {size_est:.6f}")
     print(f"  L_est     = {fmt_vec(L_init)}")
-
-    # по умолчанию показываем режим 5: траектории вершин; кубы запускаются на 'k'
-    view_mode = 5
 
     init_glut()
     glutMainLoop()
