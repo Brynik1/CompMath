@@ -431,7 +431,6 @@ cam_distance = 60.0
 cam_theta = 45.0
 cam_phi = 30.0
 
-
 # режимы:
 # 1: точки наблюдений вершин (синие)
 # 2: траектории центра масс (true/est) + CM наблюдений
@@ -550,6 +549,8 @@ def draw_legend(width, height):
         draw_text_2d(x0 + 8, y_text, "Mode 3: vertex trajectories")
     elif view_mode == 4:
         draw_text_2d(x0 + 8, y_text, "Mode 4: empty field (grid only)")
+    elif view_mode == 5:
+        draw_text_2d(x0 + 8, y_text, "Mode 5: vertex trajectories (as 3)")
 
     y_text -= 16
     draw_text_2d(x0 + 8, y_text, f"Active cubes: {len(flying_cubes)}")
@@ -655,8 +656,6 @@ def display():
             draw_trajectory(full_traj_cm_true, color=(0.0, 1.0, 0.0), width=2.0)
         if traj_cm_est is not None:
             draw_trajectory(traj_cm_est, color=(1.0, 0.3, 0.0), width=2.0)
-        if cm_obs is not None:
-            draw_points(cm_obs, color=(0.0, 0.5, 1.0), size=4.0)
 
     # 3: траектории вершин (истинные и восстановленные)
     elif view_mode == 3:
@@ -712,20 +711,30 @@ def keyboard(key, x, y):
 
     if key in (b'-', b'_'):
         cam_distance += 2.0
+        prev_utf8_byte = None
     elif key in (b'=', b'+'):
         cam_distance = max(5.0, cam_distance - 2.0)
+        prev_utf8_byte = None
     elif key == b'1':
         view_mode = 1
+        prev_utf8_byte = None
     elif key == b'2':
         view_mode = 2
+        prev_utf8_byte = None
     elif key == b'3':
         view_mode = 3
+        prev_utf8_byte = None
     elif key == b'4':
         view_mode = 4
+        prev_utf8_byte = None
+    elif key == b'5':
+        view_mode = 5
+        prev_utf8_byte = None
     elif key in (b'k', b'K'):
         # запускаем новый куб со старта восстановленной траектории
         if traj_vertices_est is not None and total_steps is not None and total_steps > 0:
             flying_cubes.append({"idx": 0})
+        prev_utf8_byte = None
     else:
         # Обработка русской "л"/"Л" в UTF‑8: D0 BB / D0 9B
         bval = key[0]
@@ -779,6 +788,15 @@ def init_glut():
     glutCreateWindow(b"Inverse problem: full cube trajectory")
     glEnable(GL_DEPTH_TEST)
     glClearColor(0.05, 0.05, 0.08, 1.0)
+
+    # сглаживание линий и точек
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    glEnable(GL_LINE_SMOOTH)
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
+    glEnable(GL_POINT_SMOOTH)
+    glHint(GL_POINT_SMOOTH_HINT, GL_NICEST)
+
     glutDisplayFunc(display)
     glutReshapeFunc(reshape)
     glutKeyboardFunc(keyboard)
