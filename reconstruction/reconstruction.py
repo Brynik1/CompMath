@@ -42,14 +42,13 @@ def reconstruct_full_cube_trajectory(
 def inverse_from_vertex_trajectories(V_obs: np.ndarray) -> dict:
     y_obs_cm = compute_com_traj_from_vertices(V_obs)
 
-    p_est = gauss_newton_cm(
+    p_est = levenberg_marquardt_cm(
         y_obs_cm=y_obs_cm,
         dt=DT,
         p0=P_INITIAL,
         npre=NPRE,
         max_iter=MAX_ITER,
         tol=TOL,
-        damping=DAMPING,
     )
 
     size_est = estimate_cube_size_from_vertices_single_frame(V_obs[0])

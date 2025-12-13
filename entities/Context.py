@@ -1,7 +1,6 @@
 import numpy as np
 
-from experiment.experiment import SIZE
-
+SIZE = 2.0
 
 class Context:
     def __init__(self):

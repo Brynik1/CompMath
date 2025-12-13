@@ -89,3 +89,56 @@ def gauss_newton_cm(
 
         p = p_new
     return p
+
+
+def levenberg_marquardt_cm(
+        y_obs_cm, dt, p0, npre=10, max_iter=100, λ=1e-3, tol=1e-8
+):
+    p = p0.copy()
+
+    for k in range(max_iter):
+        J, r = jacobian_fd_cm(p, y_obs_cm, dt, npre)
+        grad = J.T @ r
+        H = J.T @ J
+        H_reg = H + λ * np.diag(np.diag(H))
+
+        try:
+            Δp = np.linalg.solve(H_reg, -grad)
+        except:
+            λ *= 10
+            continue
+
+        # НОРМАЛИЗУЕМ шаг, если он слишком маленький
+        Δp_norm = np.linalg.norm(Δp)
+        if Δp_norm < 1e-10:
+            print(f"Шаг слишком мал ({Δp_norm:.1e}), считаем сходимость")
+            break
+
+        p_new = p + Δp
+        r_new = residuals_cm(p_new, y_obs_cm, dt, npre)
+
+        cost_old = 0.5 * np.sum(r ** 2)
+        cost_new = 0.5 * np.sum(r_new ** 2)
+
+        # ЗАЩИТА от деления на ноль и огромных ρ
+        if cost_old - cost_new > 0:
+            # Шаг улучшает - принимаем
+            p, r = p_new, r_new
+            λ = max(1e-12, λ * 0.1)
+
+            print(f"Iter {k}: cost={cost_new:.3e}, λ={λ:.1e}, "
+                  f"Δcost={cost_old - cost_new:.1e} ✓")
+        else:
+            # Шог не улучшает - отвергаем
+            λ = min(1e12, λ * 10.0)
+            print(f"Iter {k}: шаг отвергнут, λ={λ:.1e}")
+
+        # Критерии остановки
+        if np.linalg.norm(grad) < tol:
+            print(f"✓ Сошелся по градиенту")
+            break
+        if Δp_norm < tol * np.linalg.norm(p):
+            print(f"✓ Сошелся по изменению параметров")
+            break
+
+    return p
