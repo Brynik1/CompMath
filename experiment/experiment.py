@@ -1,12 +1,17 @@
-from OpenGL.GLUT import *
-from OpenGL.GLU import *
 from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
 
-import numpy as np
+SIZE = 2.0
 import math
 
+import numpy as np
 
-def calculate_plane_normal(angle_deg=0.0, rotation_axis='z'):
+from entities.Context import Context
+from entities.RigidBody import RigidBody
+
+
+def calculate_plane_normal(angle_deg=0.0, rotation_axis="z"):
     """Рассчитывает нормаль плоскости по углу наклона и оси вращения.
 
     Параметры:
@@ -18,20 +23,24 @@ def calculate_plane_normal(angle_deg=0.0, rotation_axis='z'):
     """
     angle_rad = np.radians(angle_deg)
 
-    if rotation_axis.lower() == 'z':
+    if rotation_axis.lower() == "z":
         # Поворот вокруг оси Z (наклон в направлении X)
-        normal = np.array([
-            math.sin(angle_rad),  # X-компонента
-            math.cos(angle_rad),  # Y-компонента
-            0.0  # Z-компонента
-        ])
-    elif rotation_axis.lower() == 'x':
+        normal = np.array(
+            [
+                math.sin(angle_rad),  # X-компонента
+                math.cos(angle_rad),  # Y-компонента
+                0.0,  # Z-компонента
+            ]
+        )
+    elif rotation_axis.lower() == "x":
         # Поворот вокруг оси X (наклон в направлении Z)
-        normal = np.array([
-            0.0,  # X-компонента
-            math.cos(angle_rad),  # Y-компонента
-            math.sin(angle_rad)  # Z-компонента
-        ])
+        normal = np.array(
+            [
+                0.0,  # X-компонента
+                math.cos(angle_rad),  # Y-компонента
+                math.sin(angle_rad),  # Z-компонента
+            ]
+        )
     else:
         raise ValueError("Недопустимая ось вращения. Используйте 'x' или 'z'")
 
@@ -50,7 +59,7 @@ camera_direction /= np.linalg.norm(camera_direction)  # Нормализуем
 
 
 # Параметры тела и физики
-SIZE = 2.0
+
 GRAVITY = np.array([0.0, -9.80665, 0.0])
 RESTITUTION = 0.9
 CONTACT_THRESHOLD = 0.1
@@ -59,49 +68,22 @@ CONTACT_THRESHOLD = 0.1
 # Параметры наклонной плоскости
 PLANE_SIZE_X = 20.0
 PLANE_SIZE_Z = 20.0
-PLANE_NORMAL = calculate_plane_normal(angle_deg=0, rotation_axis='x')
+PLANE_NORMAL = calculate_plane_normal(angle_deg=0, rotation_axis="x")
 PLANE_NORMAL /= np.linalg.norm(PLANE_NORMAL)  # Нормализация
 PLANE_POINT = np.array([0.0, 0.0, 0.0])  # Точка на плоскости
-
-
-class RigidBody:
-    def __init__(self):
-        self.r = np.array([0.0, 15.0, 0.0])
-        self.l = np.array([0.0, 0.0, 0.0])
-        self.q = np.array([1.0, 0.0, 0.0, 0.0])  # Начальная ориентация
-        self.L = np.array([0.0, 0.0, 0.0])
-
-    def vertices(self, size):
-        vertices_local = np.array([
-            [size, size, -size],
-            [-size, size, -size],
-            [-size, size, size],
-            [size, size, size],
-            [size, -size, size],
-            [-size, -size, size],
-            [-size, -size, -size],
-            [size, -size, -size]
-        ])
-        R = quat_to_matrix(self.q)
-        return [self.r + R @ v for v in vertices_local]
-
-
-class Context:
-    def __init__(self):
-        self.M_inv = 1.0 / 1.0
-        I_body = (1.0 / 1.0) * ((2 * SIZE) ** 2) * np.diag([1 / 6.0, 1 / 6.0, 1 / 6.0])
-        self.I_inv = np.linalg.inv(I_body)
 
 
 def quat_mult(q1, q2):
     w1, x1, y1, z1 = q1
     w2, x2, y2, z2 = q2
-    return np.array([
-        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2
-    ])
+    return np.array(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ]
+    )
 
 
 def compute_derivatives(rb, context):
@@ -122,11 +104,13 @@ def compute_derivatives(rb, context):
 
 def quat_to_matrix(q):
     w, x, y, z = q
-    return np.array([
-        [1 - 2 * y * y - 2 * z * z, 2 * x * y - 2 * z * w, 2 * x * z + 2 * y * w],
-        [2 * x * y + 2 * z * w, 1 - 2 * x * x - 2 * z * z, 2 * y * z - 2 * x * w],
-        [2 * x * z - 2 * y * w, 2 * y * z + 2 * x * w, 1 - 2 * x * x - 2 * y * y]
-    ])
+    return np.array(
+        [
+            [1 - 2 * y * y - 2 * z * z, 2 * x * y - 2 * z * w, 2 * x * z + 2 * y * w],
+            [2 * x * y + 2 * z * w, 1 - 2 * x * x - 2 * z * z, 2 * y * z - 2 * x * w],
+            [2 * x * z - 2 * y * w, 2 * y * z + 2 * x * w, 1 - 2 * x * x - 2 * y * y],
+        ]
+    )
 
 
 def rk4_step(rb, context, dt):
@@ -176,11 +160,9 @@ def is_inside_platform(position):
     else:
         axis = axis / np.linalg.norm(axis)
         # Формула Родрига для матрицы вращения
-        K = np.array([
-            [0, -axis[2], axis[1]],
-            [axis[2], 0, -axis[0]],
-            [-axis[1], axis[0], 0]
-        ])
+        K = np.array(
+            [[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]]
+        )
         R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
         R_T = R.T  # Обратное вращение
 
@@ -199,7 +181,6 @@ def check_collision(rb, context):
 
     vertices = rb.vertices(SIZE)
     contact_points = []
-
 
     for v in vertices:
         distance = np.dot(v - PLANE_POINT, PLANE_NORMAL)
@@ -384,9 +365,17 @@ def display():
 
     camera_pos = CAMERA_TARGET + camera_direction * camera_distance
 
-    gluLookAt(camera_pos[0], camera_pos[1], camera_pos[2],  # Позиция камеры
-              CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2],  # Точка наблюдения
-              0, 1, 0)  # Вектор "вверх"
+    gluLookAt(
+        camera_pos[0],
+        camera_pos[1],
+        camera_pos[2],  # Позиция камеры
+        CAMERA_TARGET[0],
+        CAMERA_TARGET[1],
+        CAMERA_TARGET[2],  # Точка наблюдения
+        0,
+        1,
+        0,
+    )  # Вектор "вверх"
 
     # Отрисовка земли
     draw_plane()
